@@ -1,0 +1,278 @@
+/* ── COSMER Annotator v2 — Design System ─────────────────────────────────── */
+
+:root {
+  --color-bg:       #0D1117;
+  --color-surface:  #161B22;
+  --color-surface2: #21262D;
+  --color-accent:   #00FFFF;
+  --color-green:    #00FF88;
+  --color-orange:   #FFA500;
+  --color-red:      #FF4444;
+  --color-blue:     #3B82F6;
+  --color-border:   #30363D;
+  --color-text:     #E6EDF3;
+  --color-text-dim: #8B949E;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 14px; }
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Typography ─────────────────────────────────────────────────────────── */
+h1, h2, h3, h4 { color: var(--color-text); font-weight: 700; line-height: 1.25; }
+
+/* ── Inputs ─────────────────────────────────────────────────────────────── */
+input, textarea, select {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(0,255,255,0.08);
+}
+textarea { resize: vertical; min-height: 72px; }
+select { cursor: pointer; }
+input[type="number"] { width: auto; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  transition: all 0.15s;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--color-accent);
+  color: #0D1117;
+  border-color: var(--color-accent);
+}
+.btn-primary:hover:not(:disabled) {
+  background: #33ffff;
+  box-shadow: 0 0 14px rgba(0,255,255,0.35);
+}
+
+.btn-green {
+  background: var(--color-green);
+  color: #0D1117;
+  border-color: var(--color-green);
+}
+.btn-green:hover:not(:disabled) {
+  background: #33ffaa;
+  box-shadow: 0 0 14px rgba(0,255,136,0.35);
+}
+
+.btn-secondary {
+  background: var(--color-surface2);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: #2d333b;
+  border-color: #555d6a;
+}
+
+.btn-red {
+  background: rgba(255,68,68,0.1);
+  color: var(--color-red);
+  border-color: rgba(255,68,68,0.3);
+}
+.btn-red:hover:not(:disabled) {
+  background: rgba(255,68,68,0.2);
+}
+
+.btn-orange {
+  background: rgba(255,165,0,0.12);
+  color: var(--color-orange);
+  border-color: rgba(255,165,0,0.3);
+}
+.btn-orange:hover:not(:disabled) {
+  background: rgba(255,165,0,0.22);
+}
+
+/* ── Cards ───────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+/* ── Progress bar ────────────────────────────────────────────────────────── */
+.progress-bar {
+  background: var(--color-surface2);
+  border-radius: 4px;
+  height: 6px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-blue));
+  transition: width 0.4s ease;
+}
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.badge-cyan   { background: rgba(0,255,255,0.1);   color: var(--color-accent); border: 1px solid rgba(0,255,255,0.25); }
+.badge-green  { background: rgba(0,255,136,0.1);   color: var(--color-green);  border: 1px solid rgba(0,255,136,0.25); }
+.badge-orange { background: rgba(255,165,0,0.1);   color: var(--color-orange); border: 1px solid rgba(255,165,0,0.25); }
+.badge-blue   { background: rgba(59,130,246,0.1);  color: var(--color-blue);   border: 1px solid rgba(59,130,246,0.25); }
+.badge-gray   { background: rgba(139,148,158,0.1); color: var(--color-text-dim); border: 1px solid rgba(139,148,158,0.2); }
+
+/* ── Drop zone ───────────────────────────────────────────────────────────── */
+.drop-zone {
+  border: 2px dashed var(--color-border);
+  border-radius: 12px;
+  padding: 32px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(0,255,255,0.01);
+}
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--color-accent);
+  background: rgba(0,255,255,0.04);
+}
+
+/* ── Thumbnail grid ──────────────────────────────────────────────────────── */
+.thumbnail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+}
+.thumbnail-card {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  aspect-ratio: 4/3;
+  background: var(--color-surface2);
+  border: 1.5px solid var(--color-border);
+  transition: border-color 0.15s;
+}
+.thumbnail-card:hover { border-color: var(--color-accent); }
+.thumbnail-card img {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+.status-dot {
+  position: absolute;
+  top: 5px; right: 5px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0,0,0,0.5);
+}
+
+/* ── Modals ──────────────────────────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9000;
+  animation: fade-in 0.15s ease;
+  backdrop-filter: blur(4px);
+}
+.modal-content {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 28px;
+  min-width: 380px;
+  max-width: 620px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  animation: slide-up 0.2s ease;
+}
+
+/* ── Toasts ──────────────────────────────────────────────────────────────── */
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  padding: 12px 20px; border-radius: 10px;
+  font-size: 13px; font-weight: 600;
+  z-index: 9999;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  animation: fade-in 0.2s ease;
+  display: flex; align-items: center; gap: 8px;
+}
+.toast-success { background: rgba(0,255,136,0.15); border: 1px solid rgba(0,255,136,0.3); color: var(--color-green); }
+.toast-error   { background: rgba(255,68,68,0.15);  border: 1px solid rgba(255,68,68,0.3);  color: var(--color-red); }
+.toast-info    { background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); color: var(--color-blue); }
+
+/* ── Shortcut key ────────────────────────────────────────────────────────── */
+.shortcut-key {
+  background: var(--color-surface2);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-dim);
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.shortcut-key:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* ── Animations ──────────────────────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1; box-shadow: 0 0 12px rgba(0,255,255,0.4); }
+}
+.animate-fade-in {
+  animation: fade-in 0.2s ease;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-dim); }
