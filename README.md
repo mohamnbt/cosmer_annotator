@@ -750,7 +750,6 @@ nn.Linear(64, 1)
 
 ---
 
-## Licence
 
 Développé par **Mohamed-Amine Boutahri** (stagiaire L3 Physique, Université de Toulon) pour le **Laboratoire COSMER**.  
 Usage interne recherche. Contact : mohamed-amine-bouthari@etud.univ-tln.fr
