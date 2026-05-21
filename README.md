@@ -2,7 +2,8 @@
 
 > **Outil d'annotation et d'apprentissage automatique pour l'estimation de la vitesse de courant marin**  
 > par analyse visuelle de câbles de mouillage sous-marins.  
-> Développé au **Laboratoire COSMER — Université de Toulon**
+> Développé au **Laboratoire COSMER — Université de Toulon**  
+> Auteur : **Mohamed-Amine Boutahri** (stagiaire L3 Physique, 2025–2026)
 
 ---
 
@@ -10,51 +11,71 @@
 
 1. [Contexte et objectif](#1-contexte-et-objectif)
 2. [Architecture générale](#2-architecture-générale)
-3. [Prérequis](#3-prérequis)
-4. [Installation](#4-installation)
-5. [Démarrage de l'application](#5-démarrage-de-lapplication)
-6. [Guide d'utilisation pas à pas](#6-guide-dutilisation-pas-à-pas)
-7. [Calculs effectués dans le backend](#7-calculs-effectués-dans-le-backend)
-8. [API REST — référence complète](#8-api-rest--référence-complète)
-9. [Structure des fichiers de données](#9-structure-des-fichiers-de-données)
-10. [Entraînement IA et modèles](#10-entraînement-ia-et-modèles)
-11. [Auto-annotation YOLO](#11-auto-annotation-yolo)
-12. [Export des données](#12-export-des-données)
-13. [Étendre / modifier l'application](#13-étendre--modifier-lapplication)
-14. [FAQ et dépannage](#14-faq-et-dépannage)
+3. [Outils utilisés et justification](#3-outils-utilisés-et-justification)
+4. [Prérequis](#4-prérequis)
+5. [Installation](#5-installation)
+6. [Démarrage de l'application](#6-démarrage-de-lapplication)
+7. [Guide d'utilisation pas à pas](#7-guide-dutilisation-pas-à-pas)
+8. [Calculs effectués dans le backend](#8-calculs-effectués-dans-le-backend)
+9. [Scripts Python standalone](#9-scripts-python-standalone)
+10. [Modèle physique du câble](#10-modèle-physique-du-câble)
+11. [API REST — référence complète](#11-api-rest--référence-complète)
+12. [Structure des fichiers de données](#12-structure-des-fichiers-de-données)
+13. [Entraînement IA et modèles](#13-entraînement-ia-et-modèles)
+14. [Auto-annotation YOLO](#14-auto-annotation-yolo)
+15. [Export des données](#15-export-des-données)
+16. [Étendre / modifier l'application](#16-étendre--modifier-lapplication)
+17. [FAQ et dépannage](#17-faq-et-dépannage)
 
 ---
 
 ## 1. Contexte et objectif
 
-Lorsqu'un câble de mouillage est soumis à un courant marin, il se défléchit et forme un angle par rapport à la verticale. Cet angle est directement corrélé à la vitesse du courant. L'application **COSMER Annotator** a été créée pour :
+Lorsqu'un câble de mouillage est soumis à un courant marin, il se défléchit et forme un angle par rapport à la verticale. Cet angle est directement corrélé à la vitesse du courant : plus le courant est fort, plus le câble est incliné.
 
-- **Annoter** des images de câbles de mouillage (issues de caméras sous-marines ou de drones DJI) en traçant leur ligne centrale (centerline) ou leur contour.
-- **Calculer automatiquement** l'angle de déflexion du câble, l'angle accordal et un indice de courbure.
-- **Construire un dataset** au format YOLO pour l'entraînement de modèles de segmentation.
-- **Entraîner un réseau de neurones** (ResNet-18) pour prédire la vitesse de courant (Vc) directement à partir d'une image.
-- **Visualiser** les statistiques du dataset et les courbes Vc = f(θ).
+L'objectif de ce travail est d'**estimer automatiquement la vitesse de courant (Vc) à partir d'images de câbles sous-marins**, sans capteur de courant dédié. Deux approches complémentaires ont été développées :
 
-L'application est conçue pour être utilisée par des chercheurs sans compétences en développement logiciel : l'interface graphique guide l'utilisateur de bout en bout.
+- **Approche deep learning — ResNet-18** : le réseau prédit Vc directement à partir de l'image entière (pixels → Vc).
+- **Approche physique + MLP** : YOLO détecte le câble → ACP calcule l'angle θ → un petit réseau MLP prédit Vc à partir de θ seul.
+
+L'application **COSMER Annotator** centralise toute la chaîne de travail :
+
+1. **Annoter** des images (centerline ou contour du câble) avec les conditions expérimentales associées.
+2. **Calculer automatiquement** l'angle de déflexion (ACP), l'angle accordal et l'indice de courbure.
+3. **Construire un dataset** au format YOLO pour entraîner des modèles de segmentation.
+4. **Entraîner** les modèles ResNet-18 ou MLP directement depuis l'interface graphique.
+5. **Visualiser** en temps réel les courbes d'entraînement, les métriques et les graphiques Vc = f(θ).
+6. **Prédire** Vc sur de nouvelles images depuis l'application.
+
+L'application est conçue pour être utilisée par des chercheurs sans compétences en développement logiciel.
 
 ---
 
 ## 2. Architecture générale
 
 ```
-annotator3/
+cosmer_annotator/
 ├── backend/
-│   ├── main.py          ← API FastAPI (Python) — toute la logique métier
-│   ├── requirements.txt ← dépendances Python
-│   └── best.pt          ← (optionnel) modèle YOLO pré-entraîné
+│   ├── main.py                     ← API FastAPI — toute la logique métier
+│   ├── requirements.txt            ← dépendances Python backend
+│   └── best.pt                     ← (optionnel) modèle YOLO pré-entraîné pour auto-annotation
 ├── frontend/
-│   ├── src/             ← Interface React + TypeScript (Vite)
+│   ├── src/                        ← Interface React + TypeScript (Vite)
+│   │   ├── pages/                  ← Pages principales (annotation, global, statistiques...)
+│   │   ├── components/             ← Composants réutilisables
+│   │   └── lib/api.ts              ← Appels API centralisés
 │   └── package.json
+├── ModelePhysique_et_ScriptEntrainement/
+│   ├── entrainementResNet18.py     ← Script standalone entraînement ResNet-18
+│   ├── entrainementMLP.py          ← Script standalone entraînement MLP (θ → Vc)
+│   ├── pred_Vc_MLP_image.py        ← Script de prédiction MLP sur image (via YOLO + ACP)
+│   ├── predResNet18.py             ← Script de prédiction ResNet-18 sur image
+│   └── modelephysique.py           ← Modèle physique analytique du câble (équation d'équilibre)
 ├── data/
-│   ├── sessions/        ← données générées (images, annotations, labels)
-│   └── models/          ← modèles PyTorch (.pth) entraînés
-├── start.sh             ← script de démarrage tout-en-un
-└── requirements.txt     ← dépendances Python (racine)
+│   ├── sessions/                   ← données générées (images, annotations, labels)
+│   └── models/                     ← modèles PyTorch (.pth) entraînés
+├── start.sh                        ← script de démarrage tout-en-un
+└── requirements.txt                ← dépendances Python (racine)
 ```
 
 **Flux de données :**
@@ -65,7 +86,7 @@ Navigateur (React) ──HTTP/REST──► FastAPI (Python)
                           ┌────────────┼────────────┐
                           ▼            ▼             ▼
                      data/sessions  OpenCV/NumPy  PyTorch/YOLO
-                     (JSON + images) (calculs)   (modèles IA)
+                     (JSON + images) (ACP, calculs) (ResNet18, MLP)
 ```
 
 Le **backend** tourne sur `http://localhost:8000` et expose une API REST.  
@@ -73,7 +94,46 @@ Le **frontend** tourne sur `http://localhost:5173` et communique exclusivement v
 
 ---
 
-## 3. Prérequis
+## 3. Outils utilisés et justification
+
+### Backend — Python / FastAPI
+
+| Outil | Rôle | Pourquoi ce choix |
+|-------|------|-------------------|
+| **FastAPI** | Framework API REST | Rapide, moderne, génère automatiquement la doc Swagger (`/docs`). Supporte les tâches d'arrière-plan (`BackgroundTasks`) indispensables pour l'entraînement non bloquant. |
+| **Uvicorn** | Serveur ASGI | Serveur léger compatible FastAPI, supporte le rechargement à chaud en dev (`--reload`). |
+| **OpenCV** (`cv2`) | Traitement d'images | Rasterisation des masques polygonaux YOLO, squelettisation avec `skimage`. |
+| **NumPy** | Calcul matriciel | ACP (matrice de covariance, valeurs propres), rééchantillonnage équidistant des points. |
+| **PyTorch + TorchVision** | Deep learning | Entraînement ResNet-18 et MLP. Supporte CUDA, Apple Silicon (MPS) et CPU automatiquement. |
+| **Ultralytics YOLO** | Détection/segmentation | YOLOv8 pour l'auto-annotation des câbles. Utilisé à la fois pour créer le dataset d'entraînement et pour la prédiction dans le pipeline MLP. |
+| **scikit-image** | Morphologie | Squelettisation (`skeletonize`) du masque de câble pour extraire la centerline. |
+| **FFmpeg** (subprocess) | Extraction vidéo | Extraction de frames depuis des vidéos DJI/GoPro. Outil standard, très rapide, appelé via `subprocess`. |
+
+### Frontend — React / TypeScript
+
+| Outil | Rôle | Pourquoi ce choix |
+|-------|------|-------------------|
+| **React 18 + TypeScript** | Interface utilisateur | Composants réactifs, typage fort, écosystème riche. |
+| **Vite** | Build tool | Démarrage instantané, HMR (hot module reload) en développement. |
+| **Recharts** | Graphiques | Bibliothèque de visualisation declarative intégrée nativement avec React. Utilisée pour les courbes de loss, scatter plots, histogrammes. |
+| **Wouter** | Routing | Routeur léger (alternative à React Router), suffit pour ce projet single-page. |
+| **Tailwind CSS** | Style | Utilitaires CSS, cohérence visuelle rapide, thème sombre/clair via variables CSS. |
+
+### Pourquoi deux approches IA (ResNet-18 vs MLP) ?
+
+| | ResNet-18 | MLP (θ → Vc) |
+|---|---|---|
+| **Entrée** | Image RGB 224×224 | Angle θ (1 scalaire) |
+| **Sortie** | Vc (cm/s) | Vc (cm/s) |
+| **Avantage** | Pas besoin de détection préalable, capture les informations visuelles fines | Modèle très léger, interprétable, cohérent avec la physique |
+| **Inconvénient** | Nécessite beaucoup de données, boîte noire | Dépend de YOLO pour extraire θ sur une image inconnue |
+| **Usage recommandé** | Dataset large, robustesse | Dataset limité, pipeline explicable, validation du modèle physique |
+
+Les deux approches sont disponibles dans l'application et dans les scripts standalone.
+
+---
+
+## 4. Prérequis
 
 ### Système
 
@@ -99,23 +159,19 @@ sudo apt update && sudo apt install ffmpeg
 
 ---
 
-## 4. Installation
+## 5. Installation
 
 ### Étape 1 — Cloner le dépôt
 
 ```bash
-git clone https://github.com/mohamnbt/annotator3.git
-cd annotator3
+git clone https://github.com/mohamnbt/cosmer_annotator.git
+cd cosmer_annotator
 ```
 
 ### Étape 2 — Installer les dépendances Python
 
 ```bash
-# Depuis la racine du projet
 pip install -r requirements.txt
-
-# Ou depuis le dossier backend
-pip install -r backend/requirements.txt
 ```
 
 Dépendances Python installées :
@@ -126,8 +182,9 @@ Dépendances Python installées :
 | `uvicorn` | Serveur ASGI |
 | `opencv-python-headless` | Traitement d'images (centerline, masques) |
 | `python-multipart` | Upload de fichiers |
-| `pydantic` | Validation des données |
+| `scikit-image` | Squelettisation morphologique |
 | `ultralytics` | Auto-annotation YOLO (optionnel) |
+| `torch`, `torchvision` | Entraînement ResNet-18 et MLP (optionnel) |
 
 ### Étape 3 — Installer les dépendances frontend
 
@@ -137,27 +194,20 @@ npm install
 cd ..
 ```
 
-### Étape 4 (optionnel) — IA : PyTorch + YOLO
+### Étape 4 (optionnel) — Modèle YOLO pré-entraîné
 
-Pour pouvoir **entraîner un modèle de régression Vc** et utiliser **l'auto-annotation YOLO** :
+Pour utiliser l'auto-annotation et le pipeline MLP :
 
 ```bash
-# PyTorch (choisir selon votre matériel)
-pip install torch torchvision          # CPU / CUDA
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu  # CPU seul
-
-# YOLO (déjà inclus dans requirements, mais pour être explicite)
-pip install ultralytics
-
-# Placer un modèle YOLO pré-entraîné (si disponible)
+# Placer un modèle YOLO segmentation pré-entraîné sur les câbles
 cp votre_modele.pt backend/best.pt
 ```
 
-> Sans PyTorch, toutes les fonctions d'annotation manuelle, d'export et de statistiques restent disponibles. Seuls l'entraînement et la prédiction Vc sont désactivés.
+> Sans `best.pt`, toutes les fonctions d'annotation manuelle, d'export et de statistiques restent disponibles. Seules l'auto-annotation et la prédiction MLP sont désactivées.
 
 ---
 
-## 5. Démarrage de l'application
+## 6. Démarrage de l'application
 
 ### Méthode rapide (recommandée)
 
@@ -166,10 +216,7 @@ chmod +x start.sh
 ./start.sh
 ```
 
-Ce script :
-1. Démarre le backend FastAPI sur le port **8000**
-2. Démarre le frontend Vite sur le port **5173**
-3. Gère l'arrêt propre des deux processus avec `Ctrl+C`
+Ce script démarre le backend FastAPI sur le port **8000** et le frontend Vite sur le port **5173**, et gère l'arrêt propre des deux processus avec `Ctrl+C`.
 
 **Ouvrir dans le navigateur :** `http://localhost:5173`
 
@@ -189,23 +236,23 @@ npm run dev
 
 ### Vérification
 
-- API backend : `http://localhost:8000/docs` → interface Swagger interactive
+- API backend + documentation interactive : `http://localhost:8000/docs`
 - Frontend : `http://localhost:5173`
 
 ---
 
-## 6. Guide d'utilisation pas à pas
+## 7. Guide d'utilisation pas à pas
 
-### 6.1 Créer une session
+### 7.1 Créer une session
 
-Une **session** est un ensemble d'images liées à une même expérience (même câble, même conditions générales).
+Une **session** est un ensemble d'images liées à une même expérience (même câble, mêmes conditions générales).
 
 1. Cliquer sur **« Nouvelle session »**
 2. Saisir un nom (sera automatiquement nettoyé : espaces → `_`, accents supprimés)
 3. Optionnel : ajouter une description et un dossier de classement
 4. Valider → la session apparaît dans la liste
 
-### 6.2 Importer des images
+### 7.2 Importer des images
 
 **Option A — Upload direct :**  
 Glisser-déposer des fichiers `.jpg`, `.jpeg` ou `.png` dans la session.
@@ -217,7 +264,7 @@ Glisser-déposer des fichiers `.jpg`, `.jpeg` ou `.png` dans la session.
 4. L'extraction se fait **en arrière-plan** via FFmpeg — une barre de progression s'affiche
 5. Les frames extraites apparaissent automatiquement dans la session
 
-### 6.3 Annoter une image
+### 7.3 Annoter une image
 
 1. Cliquer sur une image dans la liste (statut : **"À annoter"**)
 2. L'éditeur s'ouvre avec l'image à pleine taille
@@ -227,141 +274,228 @@ Glisser-déposer des fichiers `.jpg`, `.jpeg` ou `.png` dans la session.
    - `camera_angle` — angle de la caméra
    - `wave_amplitude_cm`, `wave_length_cm`, `wave_speed_cm_s` — paramètres de houle
    - `water_depth_m`, `cable_tension_n` — paramètres physiques
-   - `annotator_name` — nom de l'annotateur
-   - `notes` — remarques libres
+   - `annotator_name`, `notes`
 
 4. Tracer l'annotation :
    - **Mode centerline** : cliquer le long de l'axe central du câble, du haut vers le bas
-   - **Mode contour** : tracer les bords gauche et droit du câble séparément
+   - **Mode contour** : tracer les bords gauche et droit séparément
 
 5. Cliquer **« Enregistrer »** → l'image passe au statut **"Annotée"**
 
-> **Auto-annotation YOLO** : si un fichier `backend/best.pt` est présent, cliquer sur **« Prédire »** pour obtenir une annotation automatique à corriger manuellement.
+> **Auto-annotation YOLO** : si `backend/best.pt` est présent, cliquer sur **« Prédire »** pour obtenir une annotation automatique à corriger manuellement.
 
-### 6.4 Naviguer entre images
+### 7.4 Entraîner un modèle
 
-- Flèches **← →** du clavier ou boutons de navigation
-- Le statut de chaque image est visible dans la liste (À annoter / Annotée / Ignorée)
-- Une image peut être marquée **"Ignorée"** si elle est inutilisable
+Depuis l'onglet **🌐 Modèle global** :
 
-### 6.5 Consulter les statistiques
+1. Sélectionner la méthode : **ResNet-18** (image → Vc) ou **MLP** (angle θ → Vc)
+2. Sélectionner les sessions à utiliser (tout si vide)
+3. Régler le nombre d'époques (défaut : 50 pour ResNet, 200 pour MLP)
+4. Nommer le modèle et cliquer **« Entraîner »**
+5. Suivre la progression en temps réel : epochs, loss train/val
+6. À la fin : MAE, RMSE, courbes de loss et scatter Vc_prédit vs Vc_réel
 
-L'onglet **Statistiques** de la session affiche :
-- Taux d'annotation (annotées / ignorées / restantes)
-- Histogramme des vitesses de courant
-- Histogramme des angles de câble
-- Histogramme de l'indice de courbure
-- Répartition par direction de courant et angle de caméra
-- Nuage de points amplitude/vitesse
-- Alertes de déséquilibre du dataset
-- Graphique Vc = f(θ) (vitesse en fonction de l'angle)
+Le modèle est sauvegardé dans `data/models/`.
 
-### 6.6 Exporter le dataset
+### 7.5 Prédire Vc sur une nouvelle image
 
-L'export génère un fichier `.zip` contenant :
-- `images/train/` et `images/val/` — images réparties aléatoirement (80/20)
-- `labels/train/` et `labels/val/` — fichiers `.txt` au format YOLO
-- `annotations/train/` et `annotations/val/` — fichiers `.json` complets
-- `dataset.yaml` — fichier de configuration YOLO
-- `annotations.csv` — tableau récapitulatif de toutes les annotations
-
-Un **export global** (toutes sessions confondues) est également disponible depuis l'onglet global.
+Depuis la même page, section **« Prédire Vc »** :
+1. Sélectionner le modèle souhaité
+2. Glisser ou charger une image
+3. Cliquer **« Analyser »** → résultat en cm/s
 
 ---
 
-## 7. Calculs effectués dans le backend
+## 8. Calculs effectués dans le backend
 
-### 7.1 Angle du câble — `calc_cable_angle(points)`
+### 8.1 Angle du câble — ACP (`calc_cable_angle`)
 
-Cette fonction prend en entrée une liste de points `[{x, y}, ...]` représentant la centerline du câble et retourne trois valeurs :
-
-#### Angle de régression (`cable_angle_deg`)
-
-La direction principale du câble est calculée par **Analyse en Composantes Principales (ACP)** sur les coordonnées des points :
+La direction principale du câble est calculée par **Analyse en Composantes Principales** sur les coordonnées des points de la centerline :
 
 1. Calcul de la matrice de covariance des coordonnées centrées
 2. Décomposition en valeurs propres → le vecteur propre associé à la plus grande valeur propre donne la direction principale
-3. L'angle est calculé comme : `θ = arctan(|dx| / |dy|)` en degrés
+3. Angle de déflexion par rapport à la verticale : `θ = arctan(|dx| / |dy|)` en degrés
 
-Cet angle représente l'inclinaison du câble par rapport à la **verticale** (0° = câble parfaitement vertical, 90° = horizontal).
+Trois valeurs sont calculées et stockées dans chaque annotation :
+- `cable_angle_deg` — angle ACP (régression sur tous les points)
+- `cable_angle_chord_deg` — angle de la corde (premier → dernier point)
+- `cable_curvature_index` — `|θ_ACP - θ_chord|` (indicateur de courbure)
 
-#### Angle accordal (`cable_angle_chord_deg`)
+### 8.2 Rééchantillonnage équidistant
 
-Angle de la corde reliant le **premier et le dernier point** de la centerline :
+Pour garantir la cohérence du dataset YOLO, tous les câbles d'une session ont le **même nombre de points** `n`. Ce nombre est déterminé automatiquement comme le minimum des annotations existantes. Si une nouvelle annotation est ajoutée avec moins de points, **toutes les annotations existantes sont rééchantillonnées rétroactivement** par interpolation curviligne.
 
-```
-θ_chord = arctan(|x_last - x_first| / |y_first - y_last|)
-```
+### 8.3 Extraction de centerline depuis masque YOLO
 
-#### Indice de courbure (`cable_curvature_index`)
-
-Différence absolue entre l'angle de régression et l'angle accordal :
-
-```
-ICourbure = |θ_reg - θ_chord|
-```
-
-Un indice élevé indique un câble fortement courbé (non rectiligne), ce qui peut indiquer une interaction avec la houle.
-
-### 7.2 Rééchantillonnage équidistant — `_resample_equidistant(points, n)`
-
-Pour garantir la **cohérence du dataset**, tous les câbles d'une même session sont représentés par le **même nombre de points équidistants** :
-
-1. Calcul des longueurs des segments entre points consécutifs
-2. Calcul des abscisses curvilignes cumulées
-3. Interpolation linéaire pour placer `n` points uniformément espacés le long de la courbe
-
-Le nombre cible `n` est déterminé automatiquement : c'est le **minimum** entre le nombre de points de la nouvelle annotation et le nombre de points de toutes les annotations existantes. Ainsi, si une session contient des annotations à 40 points et qu'une nouvelle annotation est faite avec 30 points, toutes les annotations existantes sont **rééchantillonnées rétroactivement** à 30 points.
-
-### 7.3 Extraction de la centerline depuis un masque YOLO — `extract_centerline_from_mask`
-
-Quand le modèle YOLO détecte un câble, il retourne un **masque polygonal**. La centerline est extraite ainsi :
-
+Quand YOLO détecte un câble en mode segmentation :
 1. Le masque polygonal est rasterisé en image binaire
-2. La **squelettisation morphologique** (`skimage.morphology.skeletonize`) réduit le masque à une ligne centrale de 1 pixel d'épaisseur
-3. Les pixels du squelette sont ordonnés par projection sur l'axe principal (ACP)
-4. 40 points équidistants sont sélectionnés le long du squelette
-
-Si la squelettisation échoue, une méthode de secours par **tranches horizontales ou verticales** calcule le centre de masse du masque à intervalles réguliers.
-
-### 7.4 Normalisation YOLO — `write_yolo_label`
-
-Les coordonnées des points (en pixels) sont converties en coordonnées normalisées `[0, 1]` :
-
-```
-x_norm = x_pixel / image_width
-y_norm = y_pixel / image_height
-```
-
-Le fichier `.txt` résultant contient une seule ligne : `0 x1 y1 x2 y2 ... xn yn` (classe 0 = câble).
-
-### 7.5 Modèle de régression Vc — ResNet-18
-
-Le modèle d'estimation de la vitesse de courant est un **ResNet-18** modifié :
-
-```
-ResNet-18 (backbone) → FC(512→128) → ReLU → Dropout(0.3) → FC(128→1)
-```
-
-- **Entrée** : image RGB 224×224 pixels, normalisée (ImageNet mean/std)
-- **Sortie** : valeur scalaire = vitesse estimée en cm/s
-- **Fonction de perte** : MSE (Mean Squared Error)
-- **Optimiseur** : Adam (lr=1e-3)
-- **Scheduler** : StepLR (réduction du lr par 0.5 tous les `epochs/3` epochs)
-- **Augmentation** : flip horizontal aléatoire, variation de luminosité/contraste
-- **Split** : 80% entraînement / 20% validation (aléatoire)
-- **Matériel** : détection automatique GPU CUDA, Apple Silicon MPS, ou CPU
-
-Les métriques calculées à la fin de l'entraînement :
-- **MAE** (Mean Absolute Error) en cm/s
-- **RMSE** (Root Mean Squared Error) en cm/s
-- Courbes de loss train/val par epoch
-- Courbe Vc_annotations = f(θ) — données réelles
-- Courbe Vc_NN = f(θ) — prédictions du modèle
+2. **Squelettisation morphologique** (`skimage.morphology.skeletonize`) → ligne centrale 1 pixel
+3. Les pixels du squelette sont ordonnés par projection sur l'axe ACP
+4. 40 points équidistants sont sélectionnés
 
 ---
 
-## 8. API REST — référence complète
+## 9. Scripts Python standalone
+
+Le dossier `ModelePhysique_et_ScriptEntrainement/` contient des scripts Python utilisables **indépendamment de l'application**, en ligne de commande. Ils sont utiles pour :
+- Reproduire les entraînements hors de l'application
+- Adapter les hyperparamètres plus finement
+- Tester rapidement sur un dataset local
+
+### 9.1 `entrainementResNet18.py` — Entraînement ResNet-18
+
+Script complet d'entraînement du modèle ResNet-18 pour prédire Vc à partir d'images.
+
+**Ce que fait le script :**
+- Charge les images et les annotations depuis le dataset exporté par l'application (format CSV + dossier `images/`)
+- Construit un `Dataset` PyTorch personnalisé
+- Entraîne un ResNet-18 modifié (tête de régression FC 512→128→1)
+- Applique augmentations de données (flip, jitter couleur)
+- Sauvegarde le meilleur modèle (`best_model.pth`) selon la val loss
+- Affiche les courbes de loss et le scatter Vc prédit vs réel
+
+**Utilisation :**
+```bash
+cd ModelePhysique_et_ScriptEntrainement
+
+# Adapter les chemins en tête de script :
+# DATASET_PATH = "chemin/vers/dataset"
+# CSV_PATH = "chemin/vers/annotations.csv"
+
+python entrainementResNet18.py
+```
+
+**Dépendances :** `torch`, `torchvision`, `Pillow`, `pandas`, `numpy`
+
+**Hyperparamètres modifiables en tête de fichier :**
+```python
+EPOCHS = 50
+BATCH_SIZE = 16
+LEARNING_RATE = 1e-3
+```
+
+---
+
+### 9.2 `entrainementMLP.py` — Entraînement MLP (θ → Vc)
+
+Script d'entraînement d'un réseau MLP (Multi-Layer Perceptron) qui prédit Vc à partir du **seul angle ACP θ** extrait des annotations.
+
+**Architecture du MLP :**
+```
+θ (1 scalaire) → FC(1→64) → ReLU → FC(64→64) → ReLU → FC(64→1) → Vc
+```
+
+**Ce que fait le script :**
+- Lit les paires `(θ, Vc)` depuis les fichiers `.json` d'annotation de l'application
+- Normalise θ et Vc (z-score)
+- Entraîne le MLP sur ces paires
+- Sauvegarde le modèle (`.pth`) et les paramètres de normalisation
+- Affiche la courbe Vc = f(θ) : annotations vs prédictions MLP vs régression linéaire
+
+**Utilisation :**
+```bash
+python entrainementMLP.py
+# Modifier ANNOTATIONS_DIR en tête de script pour pointer vers data/sessions/
+```
+
+**Pourquoi ce modèle est intéressant :**  
+Le MLP est très léger (quelques centaines de paramètres). Son entrée θ est directement liée à la physique du câble. Sur un dataset limité, il peut surpasser ResNet-18 car il ne souffre pas du sur-apprentissage sur les détails visuels non pertinents.
+
+---
+
+### 9.3 `pred_Vc_MLP_image.py` — Prédiction MLP sur image inconnue
+
+Script de prédiction complet du pipeline MLP sur une nouvelle image, en utilisant YOLO pour détecter le câble et calculer son angle.
+
+**Pipeline complet :**
+```
+Image → YOLOv8 (segmentation) → Masque → Squelettisation → ACP → θ → MLP → Vc (cm/s)
+```
+
+**Utilisation :**
+```bash
+python pred_Vc_MLP_image.py \
+  --image chemin/vers/image.jpg \
+  --mlp chemin/vers/mlp_theta_to_vc.pth \
+  --yolo chemin/vers/best.pt
+```
+
+**Paramètres :**
+
+| Argument | Description |
+|----------|-------------|
+| `--image` | Chemin vers l'image à analyser |
+| `--mlp` | Chemin vers le modèle MLP `.pth` entraîné |
+| `--yolo` | Chemin vers le modèle YOLO `best.pt` |
+| `--conf` | Seuil de confiance YOLO (défaut : 0.5) |
+
+**Sortie :** affiche θ calculé (°) et Vc estimée (cm/s).
+
+---
+
+### 9.4 `predResNet18.py` — Prédiction ResNet-18 sur image
+
+Script de prédiction simple : charge un modèle ResNet-18 `.pth` et prédit Vc sur une image.
+
+**Utilisation :**
+```bash
+python predResNet18.py \
+  --image chemin/vers/image.jpg \
+  --model chemin/vers/modele.pth
+```
+
+---
+
+### 9.5 `modelephysique.py` — Modèle physique analytique
+
+Script de modélisation physique du câble basé sur l'**équation d'équilibre mécanique** d'un câble soumis à un courant uniforme.
+
+**Principe physique :**  
+Pour un câble de longueur `L`, de masse linéique `m`, soumis à une force de traînée hydrodynamique, l'angle de déflexion à la base θ est lié à la vitesse du courant Vc par la relation :
+
+```
+Fd = ½ · ρ · Cd · D · L · Vc²
+tan(θ) = Fd / (T₀ + m·g·L)
+```
+
+où `ρ` est la densité de l'eau, `Cd` le coefficient de traînée, `D` le diamètre du câble, `T₀` la tension initiale.
+
+**Ce que fait le script :**
+- Calcule θ = f(Vc) pour une gamme de vitesses selon les paramètres physiques du câble
+- Trace la courbe θ = f(Vc) et Vc = f(θ) du modèle physique
+- Superpose les données d'annotation réelles pour comparer modèle physique vs mesures
+- Permet de **valider** que les annotations sont cohérentes avec la physique
+
+**Utilisation :**
+```bash
+python modelephysique.py
+# Adapter les paramètres physiques en tête de script (masse, diamètre, Cd, profondeur...)
+```
+
+**Pourquoi ce script est important :**  
+Le modèle physique sert de **baseline** et de validation. Si la courbe Vc = f(θ) apprise par le MLP ou ResNet-18 s'écarte fortement du modèle physique, cela indique soit un problème dans les annotations, soit des conditions expérimentales non prises en compte (houle, inclinaison caméra, etc.).
+
+---
+
+## 10. Modèle physique du câble
+
+Le câble de mouillage est modélisé comme une structure flexible soumise à :
+- Son poids propre dans l'eau (masse linéique apparente `m_a = m - ρ·V`)
+- La force de traînée hydrodynamique (traînée de forme + frottement visqueux)
+- La tension de rappel à l'ancrage
+
+La relation entre l'angle de déflexion θ et la vitesse de courant Vc dépend des paramètres :
+- Longueur du câble `L` (m)
+- Diamètre `D` (m)
+- Masse linéique dans l'eau (kg/m)
+- Coefficient de traînée `Cd` (typiquement 1.0–1.2 pour un câble cylindrique)
+- Tension initiale `T₀` (N)
+
+Le script `modelephysique.py` permet de tracer cette courbe théorique et de la comparer aux données expérimentales collectées via l'application.
+
+---
+
+## 11. API REST — référence complète
 
 L'API complète est consultable via Swagger : `http://localhost:8000/docs`
 
@@ -370,113 +504,84 @@ L'API complète est consultable via Swagger : `http://localhost:8000/docs`
 | Méthode | Endpoint | Description |
 |---------|----------|-------------|
 | `GET` | `/api/sessions` | Liste toutes les sessions |
-| `POST` | `/api/sessions` | Crée une session (`name`, `description`, `folder`) |
+| `POST` | `/api/sessions` | Crée une session |
 | `GET` | `/api/sessions/{name}` | Détails d'une session |
 | `PATCH` | `/api/sessions/{name}` | Modifie description/dossier |
-| `DELETE` | `/api/sessions/{name}` | Supprime une session et ses données |
+| `DELETE` | `/api/sessions/{name}` | Supprime une session |
 | `POST` | `/api/sessions/batch-move` | Déplace plusieurs sessions dans un dossier |
 
-### Images
+### Images & Annotation
 
 | Méthode | Endpoint | Description |
 |---------|----------|-------------|
 | `POST` | `/api/sessions/{name}/images` | Upload d'images |
 | `GET` | `/api/sessions/{name}/images/{filename}` | Récupère une image |
-| `DELETE` | `/api/sessions/{name}/images/{filename}` | Supprime une image + annotation + label |
-| `POST` | `/api/sessions/{name}/images/{filename}/ignore` | Marque l'image comme ignorée |
+| `DELETE` | `/api/sessions/{name}/images/{filename}` | Supprime image + annotation |
+| `POST` | `/api/sessions/{name}/images/{filename}/ignore` | Marque comme ignorée |
 | `GET` | `/api/sessions/{name}/images/{filename}/predict` | Auto-annotation YOLO |
+| `GET` | `/api/sessions/{name}/annotations/{stem}` | Récupère une annotation |
+| `POST` | `/api/sessions/{name}/annotations/{stem}` | Sauvegarde une annotation |
+| `GET` | `/api/sessions/{name}/last-conditions` | Dernières conditions saisies |
 
 ### Vidéo
 
 | Méthode | Endpoint | Description |
 |---------|----------|-------------|
-| `POST` | `/api/sessions/{name}/video` | Upload vidéo + extraction frames (FFmpeg) |
-| `GET` | `/api/sessions/{name}/video/progress` | Progression de l'extraction |
+| `POST` | `/api/sessions/{name}/video` | Upload vidéo + extraction frames |
+| `GET` | `/api/sessions/{name}/video/progress` | Progression extraction |
 
-### Annotations
-
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| `GET` | `/api/sessions/{name}/annotations/{stem}` | Récupère une annotation |
-| `POST` | `/api/sessions/{name}/annotations/{stem}` | Sauvegarde une annotation |
-| `GET` | `/api/sessions/{name}/last-conditions` | Récupère les dernières conditions saisies |
-
-### Statistiques et export
+### Statistiques & Export
 
 | Méthode | Endpoint | Description |
 |---------|----------|-------------|
-| `GET` | `/api/sessions/{name}/statistics` | Statistiques complètes de la session |
-| `GET` | `/api/sessions/{name}/export/stats` | Aperçu du split train/val |
-| `GET` | `/api/sessions/{name}/export/download` | Télécharge le dataset ZIP |
-| `GET` | `/api/export/global/download` | Export ZIP global (toutes sessions) |
-| `GET` | `/api/sessions/{name}/angle-vc-data` | Points θ/Vc pour graphique |
+| `GET` | `/api/sessions/{name}/statistics` | Statistiques complètes |
+| `GET` | `/api/sessions/{name}/export/download` | Dataset ZIP (session) |
+| `GET` | `/api/export/global/download` | Dataset ZIP global |
+| `GET` | `/api/sessions/{name}/angle-vc-data` | Points θ/Vc |
 
 ### Entraînement IA
 
 | Méthode | Endpoint | Description |
 |---------|----------|-------------|
-| `POST` | `/api/sessions/{name}/train` | Lance l'entraînement (session) |
-| `GET` | `/api/sessions/{name}/train/progress` | Progression de l'entraînement |
-| `POST` | `/api/train/global` | Lance l'entraînement global |
+| `POST` | `/api/sessions/{name}/train` | Entraînement ResNet-18 (session) |
+| `GET` | `/api/sessions/{name}/train/progress` | Progression |
+| `POST` | `/api/train/global` | Entraînement global (ResNet ou MLP) |
 | `GET` | `/api/train/global/progress` | Progression entraînement global |
-| `GET` | `/api/train/global/angle-vc-data` | Points θ/Vc toutes sessions |
-| `GET` | `/api/models` | Liste les modèles entraînés |
-| `GET` | `/api/models/{filename}/download` | Télécharge un modèle `.pth` |
+| `GET` | `/api/train/global/angle-vc-data` | Points θ/Vc globaux |
+| `GET` | `/api/models` | Liste les modèles `.pth` |
+| `GET` | `/api/models/{filename}/download` | Télécharge un modèle |
+| `GET` | `/api/models/{model_name}/visualize` | Préd. vs réel sur dataset |
 | `POST` | `/api/predict` | Prédit Vc sur une image |
 
 ---
 
-## 9. Structure des fichiers de données
+## 12. Structure des fichiers de données
 
 ```
 data/
 ├── sessions/
 │   └── {session_name}/
-│       ├── session.json          ← métadonnées de la session
+│       ├── session.json              ← métadonnées de la session
 │       ├── images/
 │       │   ├── frame_000001.jpg
 │       │   └── ...
 │       ├── annotations/
-│       │   ├── frame_000001.json ← annotation complète par image
+│       │   ├── frame_000001.json     ← annotation complète par image
 │       │   └── ...
 │       └── labels/
-│           ├── frame_000001.txt  ← label YOLO (format polygone)
+│           ├── frame_000001.txt      ← label YOLO (format polygone normalisé)
 │           └── ...
 └── models/
-    ├── {session_name}_vc_model.pth  ← modèle entraîné par session
-    └── global_vc_model.pth          ← modèle entraîné toutes sessions
+    ├── {session_name}_vc_model.pth   ← modèle ResNet-18 par session
+    ├── global_vc_model.pth           ← modèle ResNet-18 global
+    └── mlp_global_model.pth          ← modèle MLP global
 ```
-
-### Format `session.json`
-
-```json
-{
-  "name": "session_courant_10cms",
-  "description": "Expérience bassin, courant 10 cm/s",
-  "folder": "experiences_2025",
-  "created_at": "2025-06-01T10:00:00",
-  "images": [
-    {
-      "filename": "frame_000001.jpg",
-      "status": "annotated",
-      "added_at": "2025-06-01T10:05:00",
-      "source_video": "video_dji.mp4"
-    }
-  ]
-}
-```
-
-Statuts possibles d'une image : `"to_annotate"` | `"annotated"` | `"ignored"`
 
 ### Format `{stem}.json` (annotation)
 
 ```json
 {
-  "points": [
-    {"x": 512.3, "y": 45.1},
-    {"x": 514.7, "y": 89.3},
-    ...
-  ],
+  "points": [{"x": 512.3, "y": 45.1}, {"x": 514.7, "y": 89.3}, "..."],
   "n_points_normalized": 40,
   "image_width": 1920,
   "image_height": 1080,
@@ -500,62 +605,58 @@ Statuts possibles d'une image : `"to_annotate"` | `"annotated"` | `"ignored"`
 }
 ```
 
-### Format `{stem}.txt` (label YOLO)
-
-```
-0 0.266813 0.041759 0.267969 0.082593 0.269010 0.123456 ...
-```
-
-Une seule ligne : `classe x1 y1 x2 y2 ... xn yn` (tous les points normalisés entre 0 et 1).
-
 ---
 
-## 10. Entraînement IA et modèles
+## 13. Entraînement IA et modèles
 
-### Entraînement par session
+### Depuis l'application
 
-Depuis l'onglet **IA** d'une session :
+1. Aller dans **🌐 Modèle global**
+2. Choisir la méthode : **ResNet-18** ou **MLP**
+3. Sélectionner les sessions, régler les époques, nommer le modèle
+4. Cliquer **« Entraîner »** → suivi en temps réel
+5. Résultats : MAE, RMSE, courbes de loss, scatter, graphique Vc = f(θ)
 
-1. Vérifier qu'au moins **4 images annotées** avec `current_speed_cm_s` renseigné sont présentes
-2. Choisir le nombre d'epochs (défaut : 50)
-3. Cliquer **« Entraîner »** → l'entraînement tourne en arrière-plan
-4. La progression (epoch courante, loss train/val) s'affiche en temps réel
-5. À la fin : MAE, RMSE, et graphiques de résultats
+### Depuis les scripts standalone
 
-Le modèle est sauvegardé dans `data/models/{session_name}_vc_model.pth`.
+Voir section [9. Scripts Python standalone](#9-scripts-python-standalone).
 
-### Entraînement global
-
-Depuis l'onglet **Global** :
-- Sélectionner une ou plusieurs sessions (ou toutes)
-- L'entraînement combine toutes les images annotées
-- Le modèle est sauvegardé sous `data/models/{model_name}.pth`
-
-### Prédiction sur une nouvelle image
+### Prédiction via l'API
 
 ```bash
-# Via l'interface : onglet "Prédire" → upload d'image → résultat en cm/s
-
-# Via l'API directement :
 curl -X POST http://localhost:8000/api/predict \
   -F "model_name=global_vc_model" \
   -F "file=@mon_image.jpg"
-# Réponse : {"vitesse_estimee": 12.34, "model_used": "global_vc_model"}
+# → {"vitesse_estimee": 12.34, "model_used": "global_vc_model"}
 ```
 
 ---
 
-## 11. Auto-annotation YOLO
+## 14. Auto-annotation YOLO
 
-Si un fichier `backend/best.pt` est présent (modèle YOLO entraîné sur des câbles), l'application peut proposer une annotation automatique :
+Si `backend/best.pt` est présent (modèle YOLOv8 segmentation entraîné sur câbles) :
 
-1. Ouvrir une image dans l'éditeur
-2. Cliquer **« Prédire »** (ou `?`)
-3. Le backend envoie l'image au modèle YOLO
-4. Le masque de segmentation détecté est squelettisé → centerline extraite
-5. Les points s'affichent sur l'image et peuvent être corrigés manuellement
+1. Ouvrir une image dans l'éditeur → cliquer **« Prédire »**
+2. Le backend applique YOLO → extrait le masque du câble
+3. Le masque est squelettisé → 40 points de centerline
+4. Les points s'affichent et peuvent être corrigés manuellement
 
-Vérifier la disponibilité du modèle :
+**Entraîner son propre modèle YOLO :**
+```bash
+# Exporter le dataset depuis l'application (Export ZIP)
+# Décompresser → dossier dataset/
+
+yolo segment train \
+  data=dataset/dataset.yaml \
+  model=yolov8n-seg.pt \
+  epochs=100 \
+  imgsz=640
+
+# Le modèle entraîné se trouve dans runs/segment/train/weights/best.pt
+cp runs/segment/train/weights/best.pt backend/best.pt
+```
+
+Vérifier le statut YOLO :
 ```bash
 curl http://localhost:8000/api/yolo/status
 # {"model_path": "...", "model_exists": true, "model_loaded": true}
@@ -563,68 +664,67 @@ curl http://localhost:8000/api/yolo/status
 
 ---
 
-## 12. Export des données
+## 15. Export des données
 
 ### Export par session
 
-```bash
+Génère un ZIP avec images + labels YOLO + annotations JSON + CSV :
+```
 GET /api/sessions/{name}/export/download
 ```
 
-Génère un ZIP avec la structure YOLO standard + CSV des annotations.
-
 ### Export global
 
-```bash
+Combine toutes les sessions (noms préfixés `{session}__` pour éviter collisions) :
+```
 GET /api/export/global/download
 ```
 
-Combine toutes les sessions. Les noms de fichiers sont préfixés par `{session_name}__` pour éviter les collisions.
-
-### Utiliser le dataset exporté avec YOLO
-
-```bash
-# Après décompression du ZIP :
-yolo segment train data=dataset.yaml model=yolov8n-seg.pt epochs=100 imgsz=640
-```
-
-Le fichier `dataset.yaml` est déjà configuré avec les bons chemins et `nc: 1` (1 classe : `cable`).
-
 ---
 
-## 13. Étendre / modifier l'application
+## 16. Étendre / modifier l'application
 
 ### Ajouter un champ de condition
 
-1. Dans `backend/main.py`, ajouter le champ dans la liste `fieldnames` de la fonction `export_download`
-2. Dans le frontend (`frontend/src/`), ajouter le champ dans le formulaire de l'éditeur d'annotation
-3. Le champ sera automatiquement sauvegardé dans `conditions` du JSON et exporté dans le CSV
+1. Dans `backend/main.py` : ajouter dans la liste `CSV_FIELDNAMES`
+2. Dans `frontend/src/` : ajouter le champ dans le formulaire de l'éditeur
+3. Le champ est automatiquement sauvegardé dans `conditions` du JSON et exporté dans le CSV
 
-### Changer le modèle IA
+### Changer le backbone IA
 
-Le backbone peut être remplacé dans la fonction `run_train_session` :
-
+Dans `run_train_global()` dans `main.py` :
 ```python
 # Remplacer ResNet-18 par ResNet-50 :
 model = models.resnet50(weights=None)
 model.fc = nn.Sequential(nn.Linear(2048, 128), nn.ReLU(), nn.Dropout(0.3), nn.Linear(128, 1))
 ```
 
+### Modifier l'architecture MLP
+
+Dans `entrainementMLP.py` ou dans `run_train_global()` pour la méthode MLP :
+```python
+# Exemple : ajouter une couche cachée
+nn.Linear(1, 64), nn.ReLU(),
+nn.Linear(64, 128), nn.ReLU(),
+nn.Linear(128, 64), nn.ReLU(),
+nn.Linear(64, 1)
+```
+
 ### Modifier les ports
 
-- Backend : changer `--port 8000` dans `start.sh` et mettre à jour l'URL dans le frontend
-- Frontend : modifier `vite.config.ts`
+- Backend : changer `--port 8000` dans `start.sh`
+- Frontend : modifier `vite.config.ts` et l'URL de l'API dans `frontend/src/lib/api.ts`
 
 ---
 
-## 14. FAQ et dépannage
+## 17. FAQ et dépannage
 
 **L'application ne démarre pas — erreur `uvicorn`**  
-→ Vérifier que Python 3.10+ est installé : `python --version`  
-→ Réinstaller les dépendances : `pip install -r backend/requirements.txt`
+→ Vérifier Python 3.10+ : `python --version`  
+→ Réinstaller : `pip install -r requirements.txt`
 
 **Le frontend ne s'ouvre pas**  
-→ Vérifier Node.js : `node --version` (doit être ≥ 18)  
+→ Vérifier Node.js ≥ 18 : `node --version`  
 → Relancer `cd frontend && npm install`
 
 **L'extraction vidéo ne fonctionne pas**  
@@ -635,18 +735,22 @@ model.fc = nn.Sequential(nn.Linear(2048, 128), nn.ReLU(), nn.Dropout(0.3), nn.Li
 → `pip install torch torchvision`
 
 **L'auto-annotation YOLO retourne "modèle non disponible"**  
-→ Placer un fichier `best.pt` dans `backend/best.pt`  
+→ Placer `best.pt` dans `backend/best.pt`  
 → Vérifier : `curl http://localhost:8000/api/yolo/status`
 
 **Les annotations existantes changent de nombre de points**  
-→ C'est normal. Le rééchantillonnage rétroactif garantit la cohérence du dataset. Toutes les annotations d'une session ont toujours le même nombre de points.
+→ Normal. Le rééchantillonnage rétroactif garantit la cohérence du dataset YOLO. Toutes les annotations d'une session ont toujours le même nombre de points.
 
 **Où sont stockées les données ?**  
-→ Dans `data/sessions/` à la racine du projet. Ce dossier n'est pas versionné (`.gitignore`). Penser à le sauvegarder séparément.
+→ Dans `data/sessions/` à la racine. Ce dossier n'est pas versionné (`.gitignore`). **Sauvegarder ce dossier séparément avant toute manipulation.**
+
+**Le modèle MLP donne de mauvais résultats**  
+→ Vérifier que `cable_angle_deg` est bien renseigné dans toutes les annotations.  
+→ Comparer avec la courbe du modèle physique (`modelephysique.py`) : si les annotations s'en écartent fortement, les conditions expérimentales sont peut-être non homogènes (houle, angle caméra variable).
 
 ---
 
 ## Licence
 
-Développé avec assistance IA par **Mohamed-Amine Boutahri** (étudiant L3 Physique) pour le laboratoire COSMER.  
-Usage interne recherche. Contact à l'adresse mohamed-amine-bouthari@etud.univ-tln.fr pour toute question.
+Développé par **Mohamed-Amine Boutahri** (stagiaire L3 Physique, Université de Toulon) pour le **Laboratoire COSMER**.  
+Usage interne recherche. Contact : mohamed-amine-bouthari@etud.univ-tln.fr
